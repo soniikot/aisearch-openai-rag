@@ -44,7 +44,7 @@ apiVersion: wdf.7sg.ai/v1
 kind: WorkloadDefinition
 version: "1.0.0"
 metadata:
-  name: aisearch-openai-rag-audio-container-apps
+  name: aisearch-openai-rag-audio
   tags:
     env: production
     app: voicerag
@@ -55,8 +55,8 @@ metadata:
     rag: azure-ai-search
     platform: container-apps
   org_id: "7sg-ai"
-  id: "aisearch-openai-rag-audio-container-apps"
-  workload_id: "aisearch-openai-rag-audio-container-apps"
+  id: "aisearch-openai-rag-audio"
+  workload_id: "aisearch-openai-rag-audio"
   version: "1.0.0"
   description: "VoiceRAG application deployed to Azure Container Apps - implements RAG support in applications using voice as their user interface"
   author: "udith@7sg.ai"
