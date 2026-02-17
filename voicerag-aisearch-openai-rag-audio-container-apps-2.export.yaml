@@ -210,7 +210,7 @@ workload:
     health:
       # Liveness probe - indicates if container is running
       liveness:
-        path: /health
+        path: /
         port: 8000
         scheme: HTTP  # HTTP or HTTPS
         initial_delay_seconds: 30  # Wait 30s before first check
