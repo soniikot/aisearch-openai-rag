@@ -143,7 +143,7 @@ workload:
         dockerfile: ./app/Dockerfile
         # Container App specific configuration
         # Use an existing Container Apps Environment to avoid subscription quota
-        environment: voicerag-containerapp-aca-env
+        environment: acaenv-sofia-frontend-tests
         identity: "<USER_ASSIGNED_IDENTITY_RESOURCE_ID>"
         resources:
           cpu: "1.0"  # CPU cores (can be increased if quota allows)
@@ -171,8 +171,8 @@ workload:
     # Container Apps require an "Environment" resource that hosts multiple container apps
     container_apps_environment:
       # Point to an existing environment (subscription is at ACA env quota).
-      name: voicerag-containerapp-aca-env
-      resource_group: rg-voicerag-containerapp
+      name: acaenv-sofia-frontend-tests
+      resource_group: sofia-frontend-tests
       location: eastus2
       # Log Analytics workspace is already associated with the existing environment.
       # If the environment is missing, AzureDeployer will create one (but that is currently blocked by quota).
