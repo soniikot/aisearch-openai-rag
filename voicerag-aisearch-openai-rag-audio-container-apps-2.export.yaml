@@ -287,14 +287,6 @@ workload:
         value: "true"
       - name: AZURE_OPENAI_ENDPOINT
         value: "<AZURE_OPENAI_ENDPOINT>"
-      - name: AZURE_CLIENT_ID
-        value: ""
-      - name: AZURE_OPENAI_API_KEY
-        value: ""
-      - name: AZURE_SEARCH_ENDPOINT
-        value: "<AZURE_SEARCH_ENDPOINT>"
-      - name: AZURE_SEARCH_API_KEY
-        value: ""
     
     # Autoscaling configuration - Container Apps autoscaling
     autoscaling:
