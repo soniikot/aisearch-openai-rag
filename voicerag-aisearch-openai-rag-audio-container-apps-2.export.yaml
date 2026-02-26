@@ -285,8 +285,6 @@ workload:
       # Azure service endpoints and keys (will be overridden by secrets)
       - name: RUNNING_IN_PRODUCTION
         value: "true"
-      - name: AZURE_OPENAI_ENDPOINT
-        value: "<AZURE_OPENAI_ENDPOINT>"
     
     # Autoscaling configuration - Container Apps autoscaling
     autoscaling:
