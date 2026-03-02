@@ -1,0 +1,78 @@
+# ==============================================================================
+# Target Definition File (TDF) - VoiceRAG Azure Container Apps
+# ==============================================================================
+# Defines the infrastructure target for VoiceRAG scenarios
+# ==============================================================================
+
+apiVersion: tdf.7sg.ai/v1
+kind: TargetDefinition
+metadata:
+  name: voicerag-azure-container-apps
+  description: Azure Container Apps target for VoiceRAG workload scenarios
+  tags:
+    env: production
+    provider: azure
+    platform: container-apps
+
+credentials:
+  azure:
+    subscription_id: "${AZURE_SUBSCRIPTION_ID}"
+    tenant_id: "${AZURE_TENANT_ID}"
+    client_id: "${AZURE_CLIENT_ID}"
+    client_secret: "${AZURE_CLIENT_SECRET}"
+
+infrastructure:
+  provider: azure
+  region: eastus2
+  resource_group: sofia-frontend-tests
+
+  container_apps:
+    environment:
+      name: acaenv-sofia-frontend-tests
+      location: eastus2
+      workload_profile: Consumption
+      log_analytics_workspace: null
+
+  registry:
+    name: uvvoiceragacr
+    url: uvvoiceragacr.azurecr.io
+    resource_group: rg-voicerag-containerapp
+    sku: Basic
+
+  key_vault:
+    name: wdf-secret-manager
+    url: https://wdf-secret-manager.vault.azure.net/
+    region: East US
+
+namespaces:
+  - name: s1-baseline
+    description: "Scenario 1 - Native baseline with gpt-4o-mini"
+    isolation: namespace
+  - name: s2-gpt4o
+    description: "Scenario 2 - Alternate with gpt-4o for higher quality"
+    isolation: namespace
+
+network:
+  ingress:
+    enabled: true
+    external: true
+    allow_insecure: false
+  egress:
+    allowed_destinations:
+      - "*.openai.azure.com"
+      - "*.search.windows.net"
+      - "*.blob.core.windows.net"
+      - "*.vault.azure.net"
+
+defaults:
+  resources:
+    cpu: "1.0"
+    memory: "2Gi"
+  autoscaling:
+    min_replicas: 1
+    max_replicas: 10
+    target_cpu_utilization: 70
+  health:
+    liveness_path: /
+    readiness_path: /health
+    port: 8000
