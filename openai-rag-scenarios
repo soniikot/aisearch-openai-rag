@@ -1,0 +1,383 @@
+# ==============================================================================
+# Workload Definition File (WDF) v2 - VoiceRAG with Two Scenarios
+# ==============================================================================
+# This WDF deploys the VoiceRAG application to Azure Container Apps with
+# two scenarios for profiling comparison:
+#   - S1 (native): Baseline with gpt-4o-mini
+#   - S2 (alternate): Higher quality with gpt-4o
+# ==============================================================================
+
+apiVersion: wdf.7sg.ai/v2
+kind: WorkloadDefinition
+metadata:
+  name: voicerag-aisearch
+  description: VoiceRAG application with RAG support using voice interface - Two scenarios for profiling
+  tags:
+    env: production
+    app: voicerag
+    type: api-service
+    framework: fastapi-aiohttp
+    llm: azure-openai
+    voice: realtime-api
+    rag: azure-ai-search
+    platform: container-apps
+  org_id: "7sg-ai"
+  id: "wdf-voicerag-v2-scenarios"
+  workload_id: "wdf-voicerag-v2-scenarios"
+  version: "2.0.0"
+  author: "udith@7sg.ai"
+  created_at: "2024-11-25T00:00:00Z"
+  updated_at: "2024-11-25T00:00:00Z"
+  status: "active"
+
+workload:
+  type: voicerag-api
+  repo: https://github.com/soniikot/aisearch-openai-rag
+  branch: main
+  path: .
+  
+  build:
+    base_image: python:3.11-slim
+    context: ./app
+    dockerfile: Dockerfile
+    optimization:
+      multi_stage: true
+      use_buildkit: true
+      cache_mounts:
+        - type: cache
+          target: /root/.cache/pip
+          id: pip-cache
+    build_args:
+      PYTHON_VERSION: "3.11"
+      BUILD_VERSION: "latest"
+    ports:
+      - 8000
+    steps:
+      system_dependencies:
+        - curl
+        - wget
+      install_dependencies: true
+      build: false
+      command:
+        - python3 -m gunicorn app:create_app -b 0.0.0.0:8000 --worker-class aiohttp.GunicornWebWorker
+
+security:
+  policies:
+    secretsInEnvAllowed: true
+    runAsNonRoot: true
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+
+secrets:
+  provider: azureKeyVault
+  azureKeyVault:
+    vault_name: wdf-secret-manager
+    vault_url: https://wdf-secret-manager.vault.azure.net/
+    region: East US
+  secretRefs:
+    - name: azure-openai-endpoint
+      injectAs: env
+      envVar: AZURE_OPENAI_ENDPOINT
+    - name: azure-openai-api-key
+      injectAs: env
+      envVar: AZURE_OPENAI_API_KEY
+    - name: azure-search-endpoint
+      injectAs: env
+      envVar: AZURE_SEARCH_ENDPOINT
+    - name: azure-search-api-key
+      injectAs: env
+      envVar: AZURE_SEARCH_API_KEY
+    - name: azure-search-index
+      injectAs: env
+      envVar: AZURE_SEARCH_INDEX
+    - name: azure-storage-account-name
+      injectAs: env
+      envVar: AZURE_STORAGE_ACCOUNT_NAME
+    - name: azure-storage-account-key
+      injectAs: env
+      envVar: AZURE_STORAGE_ACCOUNT_KEY
+    - name: azure-storage-connection-string
+      injectAs: env
+      envVar: AZURE_STORAGE_CONNECTION_STRING
+    - name: azure-storage-container
+      injectAs: env
+      envVar: AZURE_STORAGE_CONTAINER
+    - name: application-insights-instrumentation-key
+      injectAs: env
+      envVar: APPLICATIONINSIGHTS_CONNECTION_STRING
+
+acr:
+  registry: uvvoiceragacr
+  registry_url: uvvoiceragacr.azurecr.io
+  resource_group: rg-voicerag-containerapp
+  sku: Basic
+
+# ==============================================================================
+# SCENARIOS - Two deployment configurations for profiling comparison
+# ==============================================================================
+scenarios:
+  native:
+    description: "S1 Baseline - VoiceRAG with gpt-4o-mini (cost-optimized)"
+    topology:
+      components:
+        - name: voicerag-app-s1
+          role: api
+          runtime:
+            platform: azure_container_apps
+            regions:
+              - eastus2
+            image:
+              registry: uvvoiceragacr.azurecr.io
+              repository: voicerag-app
+              tag: latest
+            env:
+              - name: PYTHONUNBUFFERED
+                value: "1"
+              - name: LOG_LEVEL
+                value: INFO
+              - name: PORT
+                value: "8000"
+              - name: API_HOST
+                value: "0.0.0.0"
+              - name: API_TITLE
+                value: "VoiceRAG API - S1 Baseline"
+              - name: API_VERSION
+                value: "1.0.0"
+              - name: AZURE_OPENAI_REALTIME_DEPLOYMENT
+                value: gpt-realtime-mini
+              - name: AZURE_OPENAI_CHAT_DEPLOYMENT
+                value: gpt-4o-mini
+              - name: AZURE_OPENAI_EMBEDDING_DEPLOYMENT
+                value: text-embedding-3-large
+              - name: AZURE_OPENAI_REALTIME_VOICE_CHOICE
+                value: alloy
+              - name: AZURE_OPENAI_API_VERSION
+                value: "2024-02-15-preview"
+              - name: AZURE_SEARCH_INDEX
+                value: voicerag-intvect
+              - name: AZURE_SEARCH_SEMANTIC_CONFIGURATION
+                value: default
+              - name: AZURE_SEARCH_IDENTIFIER_FIELD
+                value: chunk_id
+              - name: AZURE_SEARCH_CONTENT_FIELD
+                value: chunk
+              - name: AZURE_SEARCH_EMBEDDING_FIELD
+                value: text_vector
+              - name: AZURE_SEARCH_TITLE_FIELD
+                value: title
+              - name: AZURE_SEARCH_USE_VECTOR_QUERY
+                value: "True"
+              - name: RUNNING_IN_PRODUCTION
+                value: "true"
+              - name: TZ
+                value: UTC
+            envFromSecretRefs:
+              - azure-openai-endpoint
+              - azure-openai-api-key
+              - azure-search-endpoint
+              - azure-search-api-key
+              - azure-search-index
+              - azure-storage-account-name
+              - azure-storage-account-key
+              - azure-storage-connection-string
+              - azure-storage-container
+              - application-insights-instrumentation-key
+            resources:
+              cpu: "1.0"
+              memory: "2Gi"
+            autoscaling:
+              minReplicas: 1
+              maxReplicas: 10
+              policy:
+                metric: cpu
+                target: 70
+            health:
+              liveness:
+                path: /
+                port: 8000
+                initialDelaySeconds: 30
+                periodSeconds: 30
+              readiness:
+                path: /health
+                port: 8000
+                initialDelaySeconds: 15
+                periodSeconds: 10
+          endpoints:
+            - name: http
+              port: 8000
+              exposure: public
+              protocol: http
+              path: /health
+          dependsOn: []
+
+    deployments:
+      - name: azure-prod-s1-baseline
+        target:
+          provider: azure
+          region: eastus2
+          cluster: acaenv-sofia-frontend-tests
+          namespace: s1-baseline
+          resourceGroup: sofia-frontend-tests
+        components:
+          - voicerag-app-s1
+
+  alternates:
+    - name: gpt-4o-highquality
+      description: "S2 Alternate - VoiceRAG with gpt-4o (higher quality responses)"
+      topology:
+        components:
+          - name: voicerag-app-s2
+            role: api
+            runtime:
+              platform: azure_container_apps
+              regions:
+                - eastus2
+              image:
+                registry: uvvoiceragacr.azurecr.io
+                repository: voicerag-app
+                tag: latest
+              env:
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+                - name: LOG_LEVEL
+                  value: INFO
+                - name: PORT
+                  value: "8000"
+                - name: API_HOST
+                  value: "0.0.0.0"
+                - name: API_TITLE
+                  value: "VoiceRAG API - S2 GPT-4o"
+                - name: API_VERSION
+                  value: "1.0.0"
+                - name: AZURE_OPENAI_REALTIME_DEPLOYMENT
+                  value: gpt-realtime-mini
+                - name: AZURE_OPENAI_CHAT_DEPLOYMENT
+                  value: gpt-4o
+                - name: AZURE_OPENAI_EMBEDDING_DEPLOYMENT
+                  value: text-embedding-3-large
+                - name: AZURE_OPENAI_REALTIME_VOICE_CHOICE
+                  value: alloy
+                - name: AZURE_OPENAI_API_VERSION
+                  value: "2024-02-15-preview"
+                - name: AZURE_SEARCH_INDEX
+                  value: voicerag-intvect
+                - name: AZURE_SEARCH_SEMANTIC_CONFIGURATION
+                  value: default
+                - name: AZURE_SEARCH_IDENTIFIER_FIELD
+                  value: chunk_id
+                - name: AZURE_SEARCH_CONTENT_FIELD
+                  value: chunk
+                - name: AZURE_SEARCH_EMBEDDING_FIELD
+                  value: text_vector
+                - name: AZURE_SEARCH_TITLE_FIELD
+                  value: title
+                - name: AZURE_SEARCH_USE_VECTOR_QUERY
+                  value: "True"
+                - name: RUNNING_IN_PRODUCTION
+                  value: "true"
+                - name: TZ
+                  value: UTC
+              envFromSecretRefs:
+                - azure-openai-endpoint
+                - azure-openai-api-key
+                - azure-search-endpoint
+                - azure-search-api-key
+                - azure-search-index
+                - azure-storage-account-name
+                - azure-storage-account-key
+                - azure-storage-connection-string
+                - azure-storage-container
+                - application-insights-instrumentation-key
+              resources:
+                cpu: "1.0"
+                memory: "2Gi"
+              autoscaling:
+                minReplicas: 1
+                maxReplicas: 10
+                policy:
+                  metric: cpu
+                  target: 70
+              health:
+                liveness:
+                  path: /
+                  port: 8000
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                readiness:
+                  path: /health
+                  port: 8000
+                  initialDelaySeconds: 15
+                  periodSeconds: 10
+            endpoints:
+              - name: http
+                port: 8000
+                exposure: public
+                protocol: http
+                path: /health
+            dependsOn: []
+
+      deployments:
+        - name: azure-prod-s2-gpt4o
+          target:
+            provider: azure
+            region: eastus2
+            cluster: acaenv-sofia-frontend-tests
+            namespace: s2-gpt4o
+            resourceGroup: sofia-frontend-tests
+          components:
+            - voicerag-app-s2
+
+# ==============================================================================
+# MONITORING AND OBSERVABILITY
+# ==============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    path: /metrics
+    port: 8000
+  logging:
+    level: info
+    format: json
+    aggregation:
+      enabled: true
+      destination: cloud-logging
+  application_insights:
+    enabled: true
+    instrumentation_key_secret: application-insights-instrumentation-key
+
+# ==============================================================================
+# DEPENDENCIES
+# ==============================================================================
+dependencies:
+  services:
+    - name: azure-openai-service
+      type: external
+      required: true
+      description: "Azure OpenAI with gpt-4o-mini, gpt-4o, gpt-realtime-mini, text-embedding-3-large"
+    - name: azure-ai-search
+      type: external
+      required: true
+      description: "Azure AI Search for vector search and RAG retrieval"
+    - name: azure-blob-storage
+      type: external
+      required: true
+      description: "Azure Blob Storage for documents and audio files"
+  infrastructure:
+    - name: azure-container-registry
+      type: container-registry
+      required: true
+      description: "Azure Container Registry for Docker images"
+
+# ==============================================================================
+# ROLLBACK CONFIGURATION
+# ==============================================================================
+rollback:
+  enabled: true
+  automatic: true
+  triggers:
+    - health_check_failure
+    - performance_degradation
+    - error_rate_threshold
+  strategy:
+    type: immediate
+    keep_previous_replicas: 1
